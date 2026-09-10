@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>瑞のWeb</title>
+<style>
+/* ===================== 基础与变量 ===================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-base: #eef1f6;
+  --glass: rgba(255,255,255,0.55);
+  --glass-strong: rgba(255,255,255,0.72);
+  --glass-border: rgba(255,255,255,0.65);
+  --line: rgba(0,0,0,0.07);
+  --accent: #0078d4;
+  --accent-dark: #005a9e;
+  --accent-soft: rgba(0,120,212,0.10);
+  --text-1: #141414;
+  --text-2: #3a3a3a;
+  --text-3: #6b6b6b;
+  --taskbar-h: 60px;
+  --splash-duration: 2.0s;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+               BlinkMacSystemFont, "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: var(--bg-base);
+  color: var(--text-1);
+  overflow-x: hidden;
+  padding-bottom: calc(var(--taskbar-h) + 28px);
+  min-height: 100vh;
+}
+
+/* ===================== 背景：高斯泼溅彩色光斑 ===================== */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 800px at 70% 110%, rgba(120,90,220,0.10), transparent 60%),
+    linear-gradient(180deg, #f4f6fa, var(--bg-base));
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.blob.b1 { width: 460px; height: 460px; left: -80px; top: -60px;
+  background: #4aa8ff; animation: drift1 18s ease-in-out infinite alternate; }
+.blob.b2 { width: 420px; height: 420px; right: -60px; top: 120px;
+  background: #5fd4e0; animation: drift2 22s ease-in-out infinite alternate; }
+.blob.b3 { width: 500px; height: 500px; left: 20%; bottom: -140px;
+  background: #b48cff; animation: drift3 20s ease-in-out infinite alternate; }
+.blob.b4 { width: 360px; height: 360px; right: 18%; bottom: 60px;
+  background: #ff9ec4; opacity: 0.4; animation: drift1 24s ease-in-out infinite alternate-reverse; }
+
+@keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,40px) scale(1.12); } }
+@keyframes drift2 { from { transform: translate(0,0) scale(1.05); } to { transform: translate(-50px,60px) scale(0.95); } }
+@keyframes drift3 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,-50px) scale(1.15); } }
+
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  backdrop-filter: blur(26px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 34px rgba(20,40,80,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* ===================== 开屏加载 ===================== */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: #f4f6fa;
+  transition: opacity .7s ease, visibility .7s;
+}
+.splash.done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.splash-avatar {
+  width: 108px; height: 108px;
+  border-radius: 24%;
+  background: linear-gradient(145deg, #ffffff, #e6eaf0);
+  border: 1px solid rgba(0,0,0,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-3);
+  font-size: 14px;
+  box-shadow: 0 10px 30px rgba(20,40,80,0.14), inset 0 1px 0 #fff;
+  object-fit: cover;
+}
+
+.ring-loader {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 4px solid rgba(0,120,212,0.14);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  animation: ring-spin .85s linear infinite;
+}
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+
+.splash-tip {
+  font-size: 15px;
+  color: var(--text-2);
+  letter-spacing: .5px;
+}
+
+.page { opacity: 0; transform: translateY(12px); transition: opacity .7s ease .05s, transform .7s ease .05s; }
+.page.ready { opacity: 1; transform: none; }
+
+/* ===================== Win11 登录界面 ===================== */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background:
+    radial-gradient(900px 620px at 50% 28%, rgba(90,170,255,0.55), transparent 70%),
+    radial-gradient(700px 520px at 28% 82%, rgba(0,80,170,0.45), transparent 70%),
+    radial-gradient(600px 440px at 78% 70%, rgba(40,130,220,0.35), transparent 70%),
+    linear-gradient(160deg, #083d75, #0078d4 55%, #0a5ca8);
+  opacity: 0;
+  transition: opacity .6s ease, visibility .6s;
+}
+.login-screen.show {
+  display: flex;
+  opacity: 1;
+  animation: login-in .5s ease;
+}
+@keyframes login-in { from { opacity: 0; } to { opacity: 1; } }
+
+.login-avatar {
+  width: 108px; height: 108px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.88);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+  overflow: hidden;
+  margin-bottom: 6px;
+  object-fit: cover;
+}
+.login-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.login-name {
+  font-size: 22px; font-weight: 500;
+  color: #ffffff;
+  text-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  letter-spacing: .3px;
+}
+
+.login-dots { display: flex; gap: 7px; margin-top: 8px; }
+.login-dots i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  animation: dot-bounce 1.1s ease-in-out infinite;
+}
+.login-dots i:nth-child(2){ animation-delay: .15s; }
+.login-dots i:nth-child(3){ animation-delay: .30s; }
+@keyframes dot-bounce {
+  0%,100% { opacity: .3; transform: translateY(0); }
+  50%     { opacity: 1; transform: translateY(-4px); }
+}
+
+.login-wait {
+  font-size: 14px;
+  color: rgba(255,255,255,0.88);
+  margin-top: 2px;
+  letter-spacing: .5px;
+}
+
+/* ===================== 页面区块 ===================== */
+.container { max-width: 980px; margin: 0 auto; padding: 0 22px; }
+
+.section {
+  display: none;
+  margin: 26px 0 44px;
+  border-radius: 14px;
+  padding: 32px 36px;
+}
+.section.active {
+  display: block;
+  animation: page-in .42s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+.section .sec-kicker {
+  font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.section .sec-title { font-size: 26px; font-weight: 600; }
+.section .sec-desc { margin-top: 8px; color: var(--text-2); font-size: 14px; line-height: 1.7; }
+
+.placeholder {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px dashed rgba(0,0,0,0.18);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.4);
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* ===================== 图片占位 ===================== */
+.img-ph {
+  margin-top: 18px;
+  min-height: 210px;
+  border: 1px dashed rgba(0,0,0,0.18);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.35);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+.img-ph svg { width: 32px; height: 32px; opacity: .55; }
+.img-ph .ph-tip { font-size: 12px; opacity: .75; line-height: 1.6; }
+.img-ph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.img-ph-grid .img-ph { margin-top: 0; min-height: 160px; }
+
+/* ===================== 页面内折叠 ===================== */
+.collapse-wrap {
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.4);
+}
+.collapse-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; cursor: pointer; user-select: none;
+  transition: background .18s;
+  font-size: 14px;
+}
+.collapse-head:hover { background: var(--accent-soft); }
+.collapse-head svg { width: 13px; height: 13px; color: var(--text-3); transition: transform .25s; }
+.collapse-head.open svg { transform: rotate(90deg); }
+.collapse-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height .38s cubic-bezier(.2,.8,.2,1);
+  background: rgba(255,255,255,0.5);
+}
+.collapse-body.open { max-height: 360px; }
+.collapse-child {
+  padding: 11px 16px 11px 44px;
+  font-size: 13px; color: var(--text-2);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer; transition: background .16s, color .16s;
+}
+.collapse-child:last-child { border-bottom: none; }
+.collapse-child:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* ===================== 世界观折叠卡片 ===================== */
+.world-card {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.45);
+}
+.world-card:first-child { margin-top: 0; }
+.world-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; cursor: pointer; user-select: none;
+  transition: background .18s;
+}
+.world-head:hover { background: var(--accent-soft); }
+.world-head .wc-title { font-size: 15px; font-weight: 600; }
+.world-head .wc-tag {
+  font-size: 11px; color: var(--accent);
+  border: 1px solid rgba(0,120,212,0.25);
+  border-radius: 5px; padding: 1px 7px; letter-spacing: 1px;
+}
+.world-head svg { width: 13px; height: 13px; margin-left: auto; color: var(--text-3); transition: transform .25s; }
+.world-card.open .world-head svg { transform: rotate(90deg); }
+.world-body { max-height: 0; overflow: hidden; transition: max-height .5s cubic-bezier(.2,.8,.2,1); }
+.world-card.open .world-body { max-height: 4000px; }
+.world-body .placeholder { margin: 0 16px 16px; }
+
+/* 世界观内容统一内边距容器 */
+.world-pad { padding: 16px; }
+
+/* 世界观 Logo 图：限制比例，避免过大遮挡文本 */
+.world-logo {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  height: 150px;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.45);
+}
+
+/* ===================== 扩列 / 其他 ===================== */
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; margin-top: 20px;
+}
+.contact-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+}
+.contact-card .cc-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.contact-card .cc-icon {
+  width: 38px; height: 38px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+}
+.contact-card .cc-icon svg { width: 20px; height: 20px; }
+.cc-qq .cc-icon { background: rgba(0,150,255,0.15); color: #0078d4; }
+.cc-wx .cc-icon { background: rgba(9,187,7,0.15); color: #1a9e1a; }
+.contact-card .cc-name { font-size: 16px; font-weight: 600; }
+.contact-card .cc-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+.cc-field {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(255,255,255,0.55);
+  padding: 10px 13px; margin-top: 12px;
+}
+.cc-field .cf-label { font-size: 12px; color: var(--text-3); flex-shrink: 0; }
+.cc-field .cf-value { font-size: 14px; letter-spacing: .5px; word-break: break-all; }
+
+.qr-image {
+  width: 100%;
+  max-width: 140px;
+  height: auto;
+  border-radius: 10px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 6px;
+  display: block;
+}
+
+.btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.win-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 16px; border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  color: var(--text-1); font-size: 13px; font-weight: 500;
+  cursor: pointer; font-family: inherit;
+  transition: background .16s, transform .1s, box-shadow .16s;
+  user-select: none;
+}
+.win-btn:hover { background: #fff; box-shadow: 0 4px 12px rgba(20,40,80,0.10); }
+.win-btn:active { transform: scale(.96); }
+.win-btn svg { width: 15px; height: 15px; }
+.win-btn.primary {
+  background: linear-gradient(180deg, #2a93e6, var(--accent));
+  border-color: rgba(0,120,212,0.4);
+  color: #fff;
+}
+.win-btn.primary:hover { background: linear-gradient(180deg, #3aa0ee, var(--accent-dark)); }
+
+.copy-hint { font-size: 12px; color: var(--text-3); margin-top: 14px; line-height: 1.7; }
+
+/* ===================== 固定底部任务栏 ===================== */
+.taskbar {
+  position: fixed;
+  left: 10px; right: 10px;
+  bottom: 10px; z-index: 1000;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 14px 36px rgba(20,40,80,0.18), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.tb-search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--line);
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .16s, box-shadow .16s;
+  min-width: 180px;
+}
+.tb-search:hover { background: #fff; box-shadow: 0 2px 8px rgba(20,40,80,0.08); }
+.tb-search svg { width: 15px; height: 15px; }
+
+.tb-start {
+  display: flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border: none; border-radius: 9px;
+  background: transparent; color: var(--accent); cursor: pointer;
+  transition: background .16s, transform .1s;
+}
+.tb-start:hover { background: var(--accent-soft); }
+.tb-start:active { transform: scale(.92); }
+.tb-start svg { width: 20px; height: 20px; }
+
+.tb-tray {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--text-2);
+}
+.tb-tray .tray-icons { display: flex; align-items: center; gap: 9px; }
+.tb-tray .tray-icons svg { width: 16px; height: 16px; color: var(--text-3); }
+.tb-clock {
+  font-size: 12px; line-height: 1.3;
+  text-align: right;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.tb-clock .time { font-weight: 600; font-size: 13px; display: block; }
+.tb-clock .date { font-size: 11px; color: var(--text-3); display: block; }
+
+/* ===================== Win 开始菜单面板 ===================== */
+.start-menu {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--taskbar-h) + 12px);
+  transform: translateX(-50%) translateY(12px) scale(.98);
+  width: 330px;
+  z-index: 1100;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 50px rgba(20,40,80,0.22), inset 0 1px 0 rgba(255,255,255,0.7);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .22s ease, transform .22s cubic-bezier(.2,.8,.2,1), visibility .22s;
+}
+.start-menu.open {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.start-menu .sm-cap {
+  font-size: 11px; color: var(--text-3); letter-spacing: 1.5px;
+  padding: 4px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px;
+}
+.sm-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 11px; border-radius: 8px; cursor: pointer;
+  font-size: 14px; color: var(--text-1);
+  transition: background .16s;
+}
+.sm-item:hover { background: var(--accent-soft); }
+.sm-item svg { width: 13px; height: 13px; color: var(--text-3); transition: transform .25s; }
+.sm-item.open svg { transform: rotate(90deg); }
+.sm-sub {
+  max-height: 0; overflow: hidden;
+  transition: max-height .34s cubic-bezier(.2,.8,.2,1);
+}
+.sm-sub.open { max-height: 300px; }
+.sm-sub-item {
+  padding: 10px 11px 10px 36px; border-radius: 8px;
+  font-size: 13px; color: var(--text-2); cursor: pointer;
+  transition: background .16s, color .16s;
+}
+.sm-sub-item:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* ===================== Toast ===================== */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--taskbar-h) + 36px);
+  transform: translateX(-50%) translateY(18px);
+  z-index: 2000;
+  padding: 11px 20px;
+  border-radius: 10px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 30px rgba(20,40,80,0.18);
+  color: var(--text-1); font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .26s ease, transform .26s ease, visibility .26s;
+}
+.toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.toast svg { width: 15px; height: 15px; color: #1a9e1a; }
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .section { padding: 24px 18px; margin: 18px 0 32px; }
+  .section .sec-title { font-size: 22px; }
+  .start-menu { width: calc(100% - 32px); }
+  .char-grid { grid-template-columns: 1fr; }
+  .info-list { grid-template-columns: 1fr; }
+  .world-logo { max-width: 100%; height: 130px; }
+}
+
+/* ===================== 内容样式 ===================== */
+.content-block {
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: var(--text-2);
+  margin: 14px 0;
+}
+.content-block p { margin: 0 0 10px; }
+.content-block strong { color: var(--text-1); font-weight: 600; }
+
+.info-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 24px;
+  margin: 14px 0;
+}
+.info-row {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.info-row .ir-label {
+  flex-shrink: 0;
+  color: var(--text-3);
+  min-width: 64px;
+}
+.info-row .ir-value {
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.tag {
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(0,120,212,0.08);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  border: 1px solid rgba(0,120,212,0.15);
+}
+
+.char-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+.char-card {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.char-card img {
+  width: 100%;
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+.char-card .cc-meta {
+  padding: 10px 14px;
+}
+.char-card .cc-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.char-card .cc-desc {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.world-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.ws-item {
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.ws-item .ws-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.ws-item .ws-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-top: 2px;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(0,120,212,0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid rgba(0,120,212,0.2);
+  transition: background .16s;
+}
+.link-btn:hover { background: rgba(0,120,212,0.14); }
+
+.banner-img {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+}
+
+.sub-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 18px 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+}
+</style>
+</head>
+<body>
+
+<!-- 背景高斯泼溅层 -->
+<div class="bg-layer">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="blob b4"></div>
+</div>
+
+<!-- ===================== 开屏加载 ===================== -->
+<div class="splash" id="splash">
+  <img class="splash-avatar" src="./Profile.jpg" alt="西瑞">
+  <div class="ring-loader"></div>
+  <div class="splash-tip">正在加载网页</div>
+</div>
+
+<!-- ===================== Win11 登录界面 ===================== -->
+<div class="login-screen" id="loginScreen">
+  <img class="login-avatar" src="./Profile.jpg" alt="西瑞">
+  <div class="login-name">瑞Auspiciousの个人网页</div>
+  <div class="login-dots"><i></i><i></i><i></i></div>
+  <div class="login-wait">请稍等...</div>
+</div>
+
+<!-- ===================== 主内容 ===================== -->
+<main class="page" id="page">
+
+  <!-- 主页 -->
+  <section class="container">
+    <div class="section glass" id="home">
+      <div class="sec-kicker">Home</div>
+      <h1 class="sec-title">西瑞 SeeRain</h1>
+      <p class="sec-desc">灰色蓝眼睛的东亚灰狼 / 哔哩哔哩游戏Up / 来自四川凉山德昌</p>
+      <div class="content-block">
+        <p>Hi，你好！很高兴你可以看到这里！这里是西瑞的第一个扩列条。</p>
+        <p>我是一只灰色的、有蓝色眼睛的东亚灰狼，你也可以叫我瑞。目前主要在哔哩哔哩做《超级动物大逃杀》的游戏实况和直播，偶尔也会播一些其他游戏。</p>
+        <p>点击底部任务栏的开始菜单，可以在简介、设定、世界观和扩列信息之间切换。</p>
+      </div>
+      <img class="banner-img" src="./To_go.jpg" alt="西瑞扩列条">
+      <div class="tag-row">
+        <span class="tag">东亚灰狼</span>
+        <span class="tag">Furry</span>
+        <span class="tag">B站游戏Up</span>
+        <span class="tag">Windows 爱好者</span>
+        <span class="tag">四川凉山</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 简介 ===================== -->
+  <section class="container">
+    <div class="section glass" id="intro">
+      <div class="sec-kicker">About</div>
+      <h2 class="sec-title">简介</h2>
+      <p class="sec-desc"> </p>
+      <div class="collapse-wrap">
+      </div>
+
+      <div class="sub-title" id="intro-basic">基础信息</div>
+      <div class="info-list">
+        <div class="info-row"><span class="ir-label">名字</span><span class="ir-value">西瑞 / SeeRain</span></div>
+        <div class="info-row"><span class="ir-label">昵称</span><span class="ir-value">瑞、沉悦</span></div>
+        <div class="info-row"><span class="ir-label">物种</span><span class="ir-value">东亚灰狼（灰色、蓝眼睛）</span></div>
+        <div class="info-row"><span class="ir-label">身份</span><span class="ir-value">Furry / B站游戏Up</span></div>
+        <div class="info-row"><span class="ir-label">来自</span><span class="ir-value">四川 凉山 德昌</span></div>
+        <div class="info-row"><span class="ir-label">系统</span><span class="ir-value">Windows 11 专业版 中文版</span></div>
+      </div>
+
+      <div class="sub-title" id="intro-hobby">兴趣爱好</div>
+      <div class="content-block">
+        <p><strong>游戏：</strong>目前主要玩《超级动物大逃杀》、《Minecraft》、《未知伤亡》和《PEAK》，还有《脑叶公司》、《航天模拟器》、《极简塔防》、《三相奇谈》、《WorldBox》和《纪念碑谷》系列。</p>
+        <p><strong>创作：</strong>正在努力学习画画，希望以后可以给自己的崽子产量。同时也在写小说，《瀚星海兽纪》和《林世界》文集已在哔哩哔哩投稿。</p>
+        <p><strong>其他：</strong>很喜欢 Windows 的设计，会根据自身情况参加一些活动，也愿意交朋友。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 设定（含两只设定） ===================== -->
+  <section class="container">
+    <div class="section glass" id="settings">
+      <div class="sec-kicker">Settings</div>
+      <h2 class="sec-title">设定</h2>
+      <p class="sec-desc">个人偏好与生活设定，可展开查看细分项目。</p>
+      <div class="collapse-wrap">
+        <div class="collapse-body" id="settings-body">
+          <div class="collapse-child" data-jump="setting-pref">偏好设定</div>
+          <div class="collapse-child" data-jump="setting-characters">两只设定</div>
+          <div class="collapse-child" data-jump="setting-display">饮食与雷点</div>
+        </div>
+      </div>
+
+      <div class="sub-title" id="setting-pref">偏好设定</div>
+      <div class="content-block">
+        <p>没什么特别的喜好，如果必须选一个最喜欢的，西瑞会选择一个<strong>有点昏暗的 24℃ 的房间</strong>。</p>
+        <p>很喜欢 <strong>Windows</strong> 的设计，目前使用 Windows 11 专业版中文版。</p>
+      </div>
+      <div class="tag-row">
+        <span class="tag">昏暗房间</span>
+        <span class="tag">24℃</span>
+        <span class="tag">Windows 11</span>
+        <span class="tag">想学画画</span>
+      </div>
+
+      <!-- 两只设定 -->
+      <div class="sub-title" id="setting-characters">两只设定</div>
+      <div class="char-grid">
+        <div class="char-card">
+          <img src="./mo.jpg" alt="默沉悦设定图">
+          <div class="cc-meta">
+            <div class="cc-name">默沉悦（第一设定）</div>
+            <div class="cc-desc">小熊猫，目前不太常出场，前后变化有一点大。</div>
+          </div>
+        </div>
+        <div class="char-card">
+          <img src="./rui.jpg" alt="西瑞设定图">
+          <div class="cc-meta">
+            <div class="cc-name">西瑞（第二设定）</div>
+            <div class="cc-desc">东亚灰狼，目前正在常使用的设定。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-title" id="setting-display">饮食与雷点</div>
+      <div class="info-list">
+        <div class="info-row"><span class="ir-label">辣椒</span><span class="ir-value">不能吃辣，虽然西瑞是四川的，但辣椒会把瑞辣傻滴</span></div>
+        <div class="info-row"><span class="ir-label">蚕豆</span><span class="ir-value">不能吃，有蚕豆病，会把瑞杀掉的xwx</span></div>
+        <div class="info-row"><span class="ir-label">喜好</span><span class="ir-value">喜欢面食：面条、包子、饺子</span></div>
+        <div class="info-row"><span class="ir-label">口味</span><span class="ir-value">偏淡</span></div>
+      </div>
+      <div class="content-block">
+        <p>没有什么特别大的雷点，只要不是太过分的都可以接受。如果你有什么雷点，请告诉我，我会注意的！</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 世界观 ===================== -->
+  <section class="container">
+    <div class="section glass" id="worldview">
+      <div class="sec-kicker">World</div>
+      <h2 class="sec-title">世界观</h2>
+
+      <!-- 瀚星海 - 兽康共和 -->
+      <div class="world-card open" id="hanhai">
+        <div class="world-head">
+          <span class="wc-tag">世界一</span>
+          <span class="wc-title">瀚星海</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>
+        </div>
+        <div class="world-body">
+          <div class="world-pad">
+            <img class="world-logo" src="./world-han.jpg" alt="瀚星海 logo">
+            <div class="content-block">
+              <p><strong>全称：</strong>兽族康米主义共和国</p>
+              <p><strong>国名来源：</strong>兽族实行共和制，以康米主义为指导思想。兽康共和曾用名"兽康帝国"，现已更名。</p>
+            </div>
+            <div class="world-stats">
+              <div class="ws-item"><div class="ws-label">疆域恒星系数</div><div class="ws-value">159 个</div></div>
+              <div class="ws-item"><div class="ws-label">直接统辖</div><div class="ws-value">153 个</div></div>
+              <div class="ws-item"><div class="ws-label">首都</div><div class="ws-value">民京斯</div></div>
+              <div class="ws-item"><div class="ws-label">行政体系</div><div class="ws-value">民主集中制</div></div>
+              <div class="ws-item"><div class="ws-label">指导思想</div><div class="ws-value">康米主义</div></div>
+              <div class="ws-item"><div class="ws-label">执政党</div><div class="ws-value">兽族康米联合联盟</div></div>
+              <div class="ws-item"><div class="ws-label">最高权力</div><div class="ws-value">兽康共和全国兽民代表大会</div></div>
+              <div class="ws-item"><div class="ws-label">人口</div><div class="ws-value">376.14 亿</div></div>
+              <div class="ws-item"><div class="ws-label">官方语言</div><div class="ws-value">启元语</div></div>
+              <div class="ws-item"><div class="ws-label">文明等级</div><div class="ws-value">暂时无法准确评定</div></div>
+            </div>
+            <div class="content-block">
+              <p><strong>行政区划：</strong></p>
+              <ul style="padding-left:20px; margin:6px 0;">
+                <li>1个首都星系区（凌星域，下辖民京斯恒星系及其周围半径0.95光年的球形星域，内辖民京斯星，天聿星，天卫-α星，天卫-β星）</li>
+                <li>5个特别星区（瑞星域，辽星域，辰星域，莫星域，顿星域）</li>
+                <li>1个直辖监督星区（兽合直辖监督星区，前身为"兽合特政区"）</li>
+                <li>23个一般星区（北星域，德宇星域，卡林-1/卡林-2/卡林-3星域，斯特热星域等）</li>
+              </ul>
+              <p><strong>种族组成：</strong>兽族（根据生物学形态不同，细分类，类下又细分部和种，例：犬类-北极狐部-北部北极狐）</p>
+            </div>
+            <a class="link-btn" href="https://b23.tv/vh6rAHm" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>
+              《瀚星海兽纪》文集
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 林世界（含统计卡片） -->
+      <div class="world-card" id="linworld">
+        <div class="world-head">
+          <span class="wc-tag">世界二</span>
+          <span class="wc-title">林世界</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>
+        </div>
+        <div class="world-body">
+          <div class="world-pad">
+            <div class="content-block" style="background: rgba(255,255,255,0.3); padding: 12px 16px; border-radius: 8px;">
+              <p style="font-style: italic; color: var(--text-1);">「大陆的深处，那里是不被应允的地方。古老文明的故事，至今在大陆上流传。」</p>
+              <p style="font-style: italic; color: var(--text-1);">「草原的尽头是大陆深处的起点，我们从未放弃，我们从未妥协。那场事件，那里发生的灾难至今没有褪去，无数勘探者留在了那时。我们明白，古老文明不愿被打扰。」</p>
+              <p style="font-style: italic; color: var(--text-1);">「我们不得不暂时停歇。但，我们从未想过再不涉足大陆的深处。现在我们仍在向着大陆深处进发，去探索大陆深处的秘密。」</p>
+            </div>
+
+            <!-- 林世界统计卡片（与瀚星海统一风格） -->
+            <div class="world-stats">
+              <div class="ws-item"><div class="ws-label">大陆名称</div><div class="ws-value">乌兹替洼大陆</div></div>
+              <div class="ws-item"><div class="ws-label">主要文明区</div><div class="ws-value">4 个</div></div>
+              <div class="ws-item"><div class="ws-label">原始区</div><div class="ws-value">5 个</div></div>
+              <div class="ws-item"><div class="ws-label">核心城市</div><div class="ws-value">阿纳斯</div></div>
+              <div class="ws-item"><div class="ws-label">阿纳斯人口</div><div class="ws-value">3.8 亿</div></div>
+              <div class="ws-item"><div class="ws-label">里尔森林覆盖</div><div class="ws-value">55%</div></div>
+              <div class="ws-item"><div class="ws-label">里尔草原占比</div><div class="ws-value">44%</div></div>
+              <div class="ws-item"><div class="ws-label">相邻海域</div><div class="ws-value">乌兹海 / 提顿洋 / 杜尔洋</div></div>
+              <div class="ws-item"><div class="ws-label">主要种族</div><div class="ws-value">狼 / 狐 / 小熊猫 / 猫 / 熊</div></div>
+              <div class="ws-item"><div class="ws-label">通行语言</div><div class="ws-value">乌兹替洼通行语</div></div>
+            </div>
+
+            <div class="sub-title">一，乌兹替洼大陆</div>
+            <div class="content-block">
+              <p><strong>1-简述：</strong></p>
+              <p>乌兹替洼大陆被乌兹海，提顿洋，杜尔洋包围。大陆的边缘是现代文明的栖息之地，巨大的森林，峡湾，平原创造了大陆上最丰饶的世界。</p>
+              <p>狼族，狐族，小熊猫组共生在由森林和草原组成的里尔地区，这里连接着大陆的最深处。</p>
+              <p>猫族占据了充斥着峡湾的特瑞斯地区，娇小体型让他们与这里格格不入却阻挡不了猫族的脚步。</p>
+              <p>熊族生存在匹欧利平原，熊族筑起的灯塔照亮了黑夜。为旅者指明了何去何从。</p>
+            </div>
+            <div class="content-block">
+              <p><strong>2-组成</strong></p>
+              <p><strong>主要文明区：</strong>里尔地区，特瑞斯地区，匹欧利平原，混容地区</p>
+              <p><strong>原始区：</strong>维斯山脉，瞿夫地区，阿莫匹沙漠，冶基高地，中央高地</p>
+            </div>
+
+            <div class="sub-title">2. 里尔地区</div>
+            <div class="content-block">
+              <p><strong>1-简述</strong></p>
+              <p>里尔地区是位于乌兹替洼大陆中低纬度的混合生态区，主要由森林和草原组成，临近杜尔洋。森林覆盖了里尔地区55%的陆地，另外44%是巨大的草原，其他的峡谷，平原，丘陵，山脉统治了剩下的1%。</p>
+              <p><strong>2-种族分布</strong></p>
+              <p>狼族主要位于里尔地区的北部，阿斯森林和星空草原组成了这里的地面。狼族建立了大大小小的城市圈分布在阿斯森林中，其中的阿纳斯是绝对的核心。</p>
+              <p>狐族喜欢生活在里尔地区的南部，狐族组建的联盟成为了森林里不可忽视的共同体。当然也有狐族选择定居在了北部，他们建立的民京斯大区紧邻阿纳斯。</p>
+              <p>小熊猫组没有大型城市，大大小小的小熊猫城镇隐藏在里尔地区，连接着狼族和狐族的巨大城市。</p>
+            </div>
+
+            <div class="sub-title">3. 阿纳斯</div>
+            <div class="content-block">
+              <p><strong>1. 位置：</strong>阿斯森林北部，靠近星空草原</p>
+              <p><strong>2. 种族：</strong>森林狼</p>
+              <p><strong>3. 人口：</strong>3.8亿</p>
+              <p><strong>4. 行政区划：</strong>阿纳斯城，甲卫一城，甲卫二城，乙卫一城，乙卫二城</p>
+              <p><strong>5. 语言：</strong>狼族语 / 乌兹替洼通行语言</p>
+              <p><strong>6. 特殊：</strong>勘探者始发地之一</p>
+            </div>
+
+            <a class="link-btn" href="https://b23.tv/LNwBADY" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M10 14 21 3"/><path d="M21 3v6"/><path d="M21 3h-6"/></svg>
+              《林世界》文集
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 其他 / 扩列 -->
+  <section class="container">
+    <div class="section glass" id="other">
+      <div class="sec-kicker">Contact</div>
+      <h2 class="sec-title">扩列信息</h2>
+      <p class="sec-desc">想扩列的朋友可在此查看联系方式，扫码或点击按钮跳转。</p>
+
+      <!-- 扩列宣言 -->
+      <div class="content-block" style="background: rgba(255,255,255,0.4); padding: 16px 20px; border-radius: 12px; border-left: 4px solid var(--accent); margin: 16px 0;">
+        <p style="font-size: 15px; font-style: italic; color: var(--text-1);">
+          「赤曜照亮深海，潮汐连接孤岛。瀚星海之下，每一座岛屿都不该独自漂流。<br>
+          加我，一起探索这片无尽之海。」
+        </p>
+        <p style="margin-top: 6px; font-size: 14px; color: var(--text-2);">
+          —— 瀚星海旅人 · 沧金城蒸汽与潮汐中，等待与你相遇。
+        </p>
+      </div>
+
+      <!-- 扩列标签 -->
+      <div class="tag-row">
+        <span class="tag">#扩列</span>
+        <span class="tag">#养火花</span>
+        <span class="tag">#暖说说</span>
+        <span class="tag">#高质量交友</span>
+        <span class="tag">#二次元</span>
+        <span class="tag">#科幻世界观</span>
+        <span class="tag">#瀚星海</span>
+      </div>
+
+      <img class="banner-img" src="./To_go.jpg" alt="西瑞扩列条">
+
+      <div class="contact-grid">
+        <!-- QQ -->
+        <div class="contact-card cc-qq">
+          <div class="cc-brand">
+            <div class="cc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c-3.2 0-5.6 2.1-5.6 4.9 0 1.2.5 2.4 1.2 3.3-.1.9-.5 2.6-1.2 3.6-.4.6-.2 1.2.3 1.2.8 0 1.8-.8 2.7-1.4-.3 2.6 1.2 4.4 2.6 4.4s2.9-1.8 2.6-4.4c.9.6 1.9 1.4 2.7 1.4.5 0 .7-.6.3-1.2-.7-1-1.1-2.7-1.2-3.6.7-.9 1.2-2.1 1.2-3.3C17.6 5.1 15.2 3 12 3Z"/></svg>
+            </div>
+            <div>
+              <div class="cc-name">QQ</div>
+              <div class="cc-sub">直接唤起 QQ 私聊</div>
+            </div>
+          </div>
+          <div class="cc-field">
+            <span class="cf-label">QQ号</span>
+            <span class="cf-value" id="qq-value">189773824</span>
+          </div>
+          <img class="qr-image" src="./QQ.jpg" alt="QQ二维码">
+          <div class="btn-row">
+            <button class="win-btn primary" data-open-qq>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+              打开QQ
+            </button>
+            <button class="win-btn" data-copy="qq">复制QQ号</button>
+          </div>
+        </div>
+
+        <!-- 微信 -->
+        <div class="contact-card cc-wx">
+          <div class="cc-brand">
+            <div class="cc-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 4C5.9 4 3 6.6 3 9.7c0 1.7.8 3.2 2.2 4.2l-.7 2.3 2.5-1.3c.8.3 1.6.4 2.5.4.3 0 .6 0 .9-.1A6 6 0 0 1 16.5 6 6.6 6.6 0 0 0 9.5 4Z"/><path d="M21 14.3c0-2.7-2.5-4.9-5.5-4.9S10 11.6 10 14.3s2.5 4.9 5.5 4.9c.7 0 1.4-.1 2-.4l2.1 1.1-.6-1.9c1.2-.8 2-2 2-2.8Z"/></svg>
+            </div>
+            <div>
+              <div class="cc-name">微信</div>
+              <div class="cc-sub">唤起微信，复制后搜索添加</div>
+            </div>
+          </div>
+          <div class="cc-field">
+            <span class="cf-label">微信号</span>
+            <span class="cf-value" id="wx-value">xirui-SeeRain</span>
+          </div>
+          <img class="qr-image" src="./wechat.jpg" alt="微信二维码">
+          <div class="btn-row">
+            <button class="win-btn primary" data-open-wx>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+              打开微信
+            </button>
+            <button class="win-btn" data-copy="wx">复制微信号</button>
+          </div>
+        </div>
+      </div>
+      <p class="copy-hint">提示：微信无法直接跳转到指定好友，点击「打开微信」后请使用「复制微信号」再在微信内搜索添加；QQ 可直接唤起私聊，若未安装 QQ 会自动跳转下载页。</p>
+
+      <!-- 其他联系方式 -->
+      <div class="sub-title">其他联系方式</div>
+      <div class="info-list">
+        <div class="info-row"><span class="ir-label">Steam</span><span class="ir-value" id="steam-value">1512382834</span></div>
+        <div class="info-row"><span class="ir-label">Outlook</span><span class="ir-value" id="outlook-value">xirui-SeeRain@outlook.com</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="win-btn" data-copy="steam">复制 Steam ID</button>
+        <button class="win-btn" data-copy="outlook">复制 Outlook</button>
+      </div>
+
+      <!-- ===================== QQ群 ===================== -->
+      <div class="sub-title">QQ 群</div>
+      <div class="content-block">
+        <p>欢迎加入<strong>西瑞の实验中心</strong>！小群里请不要胡闹。</p>
+      </div>
+      <div class="cc-field">
+        <span class="cf-label">QQ群号</span>
+        <span class="cf-value" id="qqgroup-value">1054312386</span>
+      </div>
+      <div class="btn-row">
+        <button class="win-btn primary" data-open-qqgroup>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+          打开群聊
+        </button>
+        <button class="win-btn" data-copy="qqgroup">复制群号</button>
+      </div>
+
+      <!-- 小说文集 -->
+      <div class="sub-title">小说文集</div>
+      <div class="btn-row">
+        <a class="link-btn" href="https://b23.tv/vh6rAHm" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M10 14 21 3"/><path d="M21 3v6"/><path d="M21 3h-6"/></svg>
+          《瀚星海兽纪》
+        </a>
+        <a class="link-btn" href="https://b23.tv/LNwBADY" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M10 14 21 3"/><path d="M21 3v6"/><path d="M21 3h-6"/></svg>
+          《林世界》
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===================== 固定底部任务栏 ===================== -->
+<nav class="taskbar" id="taskbar">
+  <div class="tb-search" id="tbSearch">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <span>搜索</span>
+  </div>
+  <button class="tb-start" id="startBtn" aria-label="开始菜单">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <rect x="3" y="3" width="8.4" height="8.4" rx="1.2"/>
+      <rect x="12.6" y="3" width="8.4" height="8.4" rx="1.2"/>
+      <rect x="3" y="12.6" width="8.4" height="8.4" rx="1.2"/>
+      <rect x="12.6" y="12.6" width="8.4" height="8.4" rx="1.2"/>
+    </svg>
+  </button>
+  <div class="tb-tray">
+    <div class="tray-icons">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><rect x="4" y="9" width="10" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
+    </div>
+    <div class="tb-clock">
+      <span class="time" id="tbTime">00:00</span>
+      <span class="date" id="tbDate">2026/01/01</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== Win 开始菜单面板 ===================== -->
+<div class="start-menu" id="startMenu">
+  <div class="sm-cap">导航菜单</div>
+  <div class="sm-item" data-direct="home"><span>主页</span></div>
+  <div class="sm-item" data-toggle="sm-intro">
+    <span>简介</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>
+  </div>
+  <div class="sm-sub" id="sm-intro">
+    <div class="sm-sub-item" data-jump="intro-basic">基础信息</div>
+    <div class="sm-sub-item" data-jump="intro-hobby">兴趣爱好</div>
+  </div>
+  <div class="sm-item" data-toggle="sm-settings">
+    <span>设定</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>
+  </div>
+  <div class="sm-sub" id="sm-settings">
+    <div class="sm-sub-item" data-jump="setting-pref">偏好设定</div>
+    <div class="sm-sub-item" data-jump="setting-characters">两只设定</div>
+    <div class="sm-sub-item" data-jump="setting-display">饮食与雷点</div>
+  </div>
+  <div class="sm-item" data-toggle="sm-world">
+    <span>世界观</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>
+  </div>
+  <div class="sm-sub" id="sm-world">
+    <div class="sm-sub-item" data-jump="hanhai">瀚星海</div>
+    <div class="sm-sub-item" data-jump="linworld">林世界</div>
+  </div>
+  <div class="sm-item" data-direct="other"><span>其他</span></div>
+</div>
+
+<!-- ===================== Toast ===================== -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>
+  <span id="toast-text">已复制</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ===================== 配置 ===================== */
+  var QQ_NUMBER = '189773824';
+  var WX_ID = 'xirui-SeeRain';
+  var QQ_GROUP = '1054312386';  // 群号
+
+  if (QQ_NUMBER) { var qv = document.getElementById('qq-value'); if (qv) qv.textContent = QQ_NUMBER; }
+  if (WX_ID) { var wv = document.getElementById('wx-value'); if (wv) wv.textContent = WX_ID; }
+  if (QQ_GROUP) { var gv = document.getElementById('qqgroup-value'); if (gv) gv.textContent = QQ_GROUP; }
+
+  /* ===================== 开屏加载 ===================== */
+  var splashDuration = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--splash-duration')) * 1000;
+  if (isNaN(splashDuration) || splashDuration <= 0) splashDuration = 2000;
+
+  var splash = document.getElementById('splash');
+  var page = document.getElementById('page');
+  var loginScreen = document.getElementById('loginScreen');
+
+  var splashFinished = false;
+  function finishSplash() {
+    if (splashFinished) return;
+    splashFinished = true;
+    splash.classList.add('done');
+    loginScreen.classList.add('show');
+    setTimeout(enterSite, 1800);
+  }
+  setTimeout(finishSplash, splashDuration);
+  setTimeout(function () { if (!splashFinished) finishSplash(); }, 5000);
+
+  function enterSite() {
+    loginScreen.classList.remove('show');
+    page.classList.add('ready');
+  }
+
+  /* ===================== 页面切换 ===================== */
+  var allSections = document.querySelectorAll('.section');
+
+  function showPage(id) {
+    allSections.forEach(function (s) { s.classList.remove('active'); });
+    var target = document.getElementById(id);
+    if (target) target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function scrollInPage(el) {
+    if (!el) return;
+    var y = el.getBoundingClientRect().top + window.pageYOffset - 16;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }
+
+  function parentPageOf(subId) {
+    if (subId === 'intro-basic' || subId === 'intro-hobby') return 'intro';
+    if (subId === 'setting-pref' || subId === 'setting-characters' || subId === 'setting-display') return 'settings';
+    if (subId === 'hanhai' || subId === 'linworld') return 'worldview';
+    return null;
+  }
+
+  showPage('home');
+
+  /* ===================== 页面内折叠 ===================== */
+  document.querySelectorAll('.collapse-head').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var body = document.getElementById(head.getAttribute('data-target'));
+      var open = body.classList.toggle('open');
+      head.classList.toggle('open', open);
+    });
+  });
+  document.querySelectorAll('.collapse-child').forEach(function (child) {
+    child.addEventListener('click', function () {
+      var t = document.getElementById(child.getAttribute('data-jump'));
+      scrollInPage(t);
+    });
+  });
+
+  /* ===================== 世界观折叠卡片 ===================== */
+  document.querySelectorAll('.world-card').forEach(function (card) {
+    card.querySelector('.world-head').addEventListener('click', function () {
+      card.classList.toggle('open');
+    });
+  });
+
+  /* ===================== 开始菜单 ===================== */
+  var startBtn = document.getElementById('startBtn');
+  var startMenu = document.getElementById('startMenu');
+  var tbSearch = document.getElementById('tbSearch');
+
+  function toggleStart() { startMenu.classList.toggle('open'); }
+
+  function closeStart() {
+    startMenu.classList.remove('open');
+    document.querySelectorAll('.sm-item.open').forEach(function (i) { i.classList.remove('open'); });
+    document.querySelectorAll('.sm-sub.open').forEach(function (s) { s.classList.remove('open'); });
+  }
+
+  startBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    toggleStart();
+  });
+  if (tbSearch) {
+    tbSearch.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!startMenu.classList.contains('open')) toggleStart();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!startMenu.contains(e.target) && e.target !== startBtn && !startBtn.contains(e.target)
+        && e.target !== tbSearch && !tbSearch.contains(e.target)) {
+      closeStart();
+    }
+  });
+
+  /* ===================== 任务栏时钟 ===================== */
+  var tbTime = document.getElementById('tbTime');
+  var tbDate = document.getElementById('tbDate');
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function updateClock() {
+    var now = new Date();
+    if (tbTime) tbTime.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    if (tbDate) tbDate.textContent = now.getFullYear() + '/' + pad(now.getMonth() + 1) + '/' + pad(now.getDate());
+  }
+  updateClock();
+  setInterval(updateClock, 1000 * 15);
+
+  document.querySelectorAll('.sm-item[data-direct]').forEach(function (item) {
+    item.addEventListener('click', function () {
+      showPage(item.getAttribute('data-direct'));
+      closeStart();
+    });
+  });
+
+  document.querySelectorAll('.sm-item[data-toggle]').forEach(function (item) {
+    item.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var sub = document.getElementById(item.getAttribute('data-toggle'));
+      var willOpen = !sub.classList.contains('open');
+      document.querySelectorAll('.sm-sub.open').forEach(function (s) { s.classList.remove('open'); });
+      document.querySelectorAll('.sm-item.open').forEach(function (i) { i.classList.remove('open'); });
+      if (willOpen) { item.classList.add('open'); sub.classList.add('open'); }
+    });
+  });
+
+  document.querySelectorAll('.sm-sub-item').forEach(function (si) {
+    si.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var subId = si.getAttribute('data-jump');
+      var target = document.getElementById(subId);
+      var parentId = parentPageOf(subId);
+      if (parentId) showPage(parentId);
+      if (!target) { closeStart(); return; }
+      var body = target.closest('.collapse-body');
+      if (body && !body.classList.contains('open')) {
+        body.classList.add('open');
+        var h = document.querySelector('.collapse-head[data-target="' + body.id + '"]');
+        if (h) h.classList.add('open');
+      }
+      var card = target.closest('.world-card');
+      if (card && !card.classList.contains('open')) card.classList.add('open');
+      closeStart();
+      setTimeout(function () { scrollInPage(target); }, 220);
+    });
+  });
+
+  /* ===================== 复制 + Toast ===================== */
+  var toast = document.getElementById('toast');
+  var toastText = document.getElementById('toast-text');
+  var toastTimer = null;
+  function showToast(msg) {
+    toastText.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
+  }
+  function copyText(text, okMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { showToast(okMsg); })
+        .catch(function () { fallbackCopy(text, okMsg); });
+    } else { fallbackCopy(text, okMsg); }
+  }
+  function fallbackCopy(text, okMsg) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast(okMsg); }
+    catch (e) { showToast('复制失败，请手动复制'); }
+    document.body.removeChild(ta);
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var which = btn.getAttribute('data-copy');
+      var elMap = { qq: 'qq-value', wx: 'wx-value', steam: 'steam-value', outlook: 'outlook-value', qqgroup: 'qqgroup-value' };
+      var msgMap = { qq: 'QQ号已复制', wx: '微信号已复制', steam: 'Steam ID已复制', outlook: 'Outlook已复制', qqgroup: 'QQ群号已复制' };
+      var el = document.getElementById(elMap[which]);
+      var text = el ? el.textContent.trim() : '';
+      if (!text || text === '待填写') { showToast('该号码尚未配置'); return; }
+      copyText(text, msgMap[which] || '已复制');
+    });
+  });
+
+  /* ===================== QQ / 微信 / QQ群 跳转 ===================== */
+  function openQQ() {
+    if (!QQ_NUMBER) { showToast('请先在代码中配置 QQ 号'); return; }
+    var jumped = false;
+    var timer = setTimeout(function () {
+      if (!jumped) window.location.href = 'https://im.qq.com/';
+    }, 1800);
+    function onLeave() { jumped = true; clearTimeout(timer); cleanup(); }
+    function cleanup() {
+      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', onVis);
+    }
+    function onVis() { if (document.hidden) { jumped = true; clearTimeout(timer); cleanup(); } }
+    window.addEventListener('blur', onLeave);
+    document.addEventListener('visibilitychange', onVis);
+    var a = document.createElement('a');
+    a.href = 'mqqwpa://im/chat?chat_type=wpa&uin=' + QQ_NUMBER;
+    a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); }, 500);
+  }
+
+  function openWX() {
+    var a = document.createElement('a');
+    a.href = 'weixin://';
+    a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); }, 500);
+  }
+
+  function openQQGroup() {
+    if (!QQ_GROUP) { showToast('请先在代码中配置 QQ 群号'); return; }
+    var jumped = false;
+    var timer = setTimeout(function () {
+      if (!jumped) window.location.href = 'https://im.qq.com/';
+    }, 1800);
+    function onLeave() { jumped = true; clearTimeout(timer); cleanup(); }
+    function cleanup() {
+      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', onVis);
+    }
+    function onVis() { if (document.hidden) { jumped = true; clearTimeout(timer); cleanup(); } }
+    window.addEventListener('blur', onLeave);
+    document.addEventListener('visibilitychange', onVis);
+    var a = document.createElement('a');
+    a.href = 'mqqwpa://im/chat?chat_type=group&uin=' + QQ_GROUP;
+    a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); }, 500);
+  }
+
+  document.querySelector('[data-open-qq]').addEventListener('click', openQQ);
+  document.querySelector('[data-open-wx]').addEventListener('click', openWX);
+  document.querySelector('[data-open-qqgroup]').addEventListener('click', openQQGroup);
+
+})();
+</script>
+</body>
+</html>
